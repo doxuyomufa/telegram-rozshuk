@@ -8,10 +8,7 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
 
-API_TOKEN = os.getenv("BOT_TOKEN")
-if not API_TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set in environment variables")
-
+API_TOKEN = "8415722752:AAG223wC-0PAlDd0Ax-jYKpIOVgC7g1M_QU"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = "super_secret_key"  # можно любой текст
 WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
@@ -37,10 +34,28 @@ main_menu = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+# Новое меню после прохождения проверки
+interest_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Зняти з Розшуку"),
+            KeyboardButton(text="Бронювання"),
+            KeyboardButton(text="Виїзд за кордон"),
+        ]
+    ],
+    resize_keyboard=True,
+)
+
+consultation_button = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="Консультація", url="https://t.me/robic33ai")]
+    ]
+)
+
 # --- Хендлеры ---
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer("Привет! Чтобы продолжить, напиши число 5 + 3 = ?")
+    await message.answer("Привіт! Аби продовжити напиши число 5 + 3 = ?")
 
 @dp.message(F.text == "8")
 async def after_captcha(message: types.Message):
@@ -49,7 +64,33 @@ async def after_captcha(message: types.Message):
         (message.from_user.id, message.from_user.username),
     )
     conn.commit()
-    await message.answer("Отлично, вы прошли проверку! Что вас интересует?", reply_markup=main_menu)
+    await message.answer("Чудово, Ви пройшли перевірку! Що Вас цікавить?", reply_markup=interest_menu)
+
+# Новый хендлер для трёх новых кнопок
+@dp.message(F.text.in_(["Зняти з Розшуку", "Бронювання", "Виїзд за кордон"]))
+async def interest_choice(message: types.Message):
+    cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
+    conn.commit()
+
+    if message.text == "Зняти з Розшуку":
+        text = (
+            "Інформація про зняття з розшуку:\n"
+            "Тут опис процедури, необхідні документи та контакти.\n"
+        )
+    elif message.text == "Бронювання":
+        text = (
+            "Інформація про бронювання:\n"
+            "Як зробити бронювання, терміни та умови.\n"
+        )
+    elif message.text == "Виїзд за кордон":
+        text = (
+            "Інформація про виїзд за кордон:\n"
+            "Правила, необхідні документи та поради.\n"
+        )
+    else:
+        text = "Інформація відсутня."
+
+    await message.answer(text, reply_markup=consultation_button)
 
 @dp.message(F.text.in_(["Хочу консультацию", "Просто узнать"]))
 async def ask_interest(message: types.Message):
