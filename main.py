@@ -2,7 +2,7 @@ import logging
 import sqlite3
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command, Text
+from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 API_TOKEN = "7922526391:AAF6f9uxMOc2CDvaHBU5NrX7DI9ET-d-ysE"
@@ -29,12 +29,14 @@ async def start(message: types.Message):
 
 @dp.message(F.text == "8")
 async def after_captcha(message: types.Message):
-    cursor.execute("INSERT OR IGNORE INTO users (id, username, interactions) VALUES (?, ?, 0)", 
-                   (message.from_user.id, message.from_user.username))
+    cursor.execute(
+        "INSERT OR IGNORE INTO users (id, username, interactions) VALUES (?, ?, 0)",
+        (message.from_user.id, message.from_user.username)
+    )
     conn.commit()
     await message.answer("Отлично, вы прошли проверку! Что вас интересует?", reply_markup=main_menu)
 
-@dp.message(Text(equals=["Хочу консультацию", "Просто узнать"]))
+@dp.message(F.text.in_(["Хочу консультацию", "Просто узнать"]))
 async def ask_interest(message: types.Message):
     cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
     conn.commit()
