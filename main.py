@@ -11,7 +11,7 @@ from aiohttp import web
 API_TOKEN = "8415722752:AAG223wC-0PAlDd0Ax-jYKpIOVgC7g1M_QU"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = "super_secret_key"  # можно любой текст
-WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
+WEBHOOK_URL = "https://telegram-bot-1-fwf1.onrender.com/webhook"
 
 logging.basicConfig(level=logging.INFO)
 
