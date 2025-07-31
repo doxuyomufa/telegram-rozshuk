@@ -1,11 +1,17 @@
+import asyncio
 import logging
 import sqlite3
-import asyncio
+import os
+
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiohttp import web
 
-API_TOKEN = "7922526391:AAF6f9uxMOc2CDvaHBU5NrX7DI9ET-d-ysE"
+API_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_SECRET = "super_secret_key"  # можно любой текст
+WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +21,9 @@ dp = Dispatcher()
 # --- База данных ---
 conn = sqlite3.connect("db.sqlite3")
 cursor = conn.cursor()
-cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, interactions INT)")
+cursor.execute(
+    "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, interactions INT)"
+)
 conn.commit()
 
 # --- Кнопки ---
@@ -23,10 +31,10 @@ main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Хочу консультацию"), KeyboardButton(text="Просто узнать")]
     ],
-    resize_keyboard=True
+    resize_keyboard=True,
 )
 
-# --- Старт ---
+# --- Хендлеры ---
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer("Привет! Чтобы продолжить, напиши число 5 + 3 = ?")
@@ -35,7 +43,7 @@ async def start(message: types.Message):
 async def after_captcha(message: types.Message):
     cursor.execute(
         "INSERT OR IGNORE INTO users (id, username, interactions) VALUES (?, ?, 0)",
-        (message.from_user.id, message.from_user.username)
+        (message.from_user.id, message.from_user.username),
     )
     conn.commit()
     await message.answer("Отлично, вы прошли проверку! Что вас интересует?", reply_markup=main_menu)
@@ -44,12 +52,12 @@ async def after_captcha(message: types.Message):
 async def ask_interest(message: types.Message):
     cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
     conn.commit()
-    markup = InlineKeyboardMarkup(
+    manager_button = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Написать менеджеру", url="https://t.me/ManagerUsername")]
         ]
     )
-    await message.answer("Спасибо! Свяжитесь с нашим менеджером:", reply_markup=markup)
+    await message.answer("Спасибо! Свяжитесь с нашим менеджером:", reply_markup=manager_button)
 
 @dp.message(Command("stats"))
 async def stats(message: types.Message):
@@ -57,8 +65,27 @@ async def stats(message: types.Message):
     users, interactions = cursor.fetchone()
     await message.answer(f"Пользователей: {users}\nВсего взаимодействий: {interactions or 0}")
 
-async def main():
-    await dp.start_polling(bot)
+# --- Webhook-сервер ---
+async def on_startup(app):
+    await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
+
+async def on_shutdown(app):
+    await bot.delete_webhook()
+
+async def handle_webhook(request):
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+        return web.Response(status=403)
+    data = await request.json()
+    update = types.Update(**data)
+    await dp.feed_update(bot, update)
+    return web.Response()
+
+def main():
+    app = web.Application()
+    app.router.add_post(WEBHOOK_PATH, handle_webhook)
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
