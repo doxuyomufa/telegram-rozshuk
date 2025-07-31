@@ -1,17 +1,15 @@
-import asyncio
-import logging
 import os
-
+import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
 
-API_TOKEN = os.getenv("API_TOKEN")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Например: https://telegram-bot-2-1aou.onrender.com
+API_TOKEN = os.getenv("API_TOKEN")  # Токен бота
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Например https://telegram-bot-7pjk.onrender.com
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "super_secret_key")
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 
 logging.basicConfig(level=logging.INFO)
 
@@ -51,12 +49,17 @@ async def send_info(message: types.Message):
     choice = message.text
     await message.answer(texts[choice], reply_markup=consultation_button)
 
+# Установка webhook при старте приложения (если WEBHOOK_HOST задан)
 async def on_startup(app):
-    await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
+    if WEBHOOK_URL:
+        logging.info(f"Setting webhook: {WEBHOOK_URL}")
+        await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
 
 async def on_shutdown(app):
+    logging.info("Deleting webhook")
     await bot.delete_webhook()
 
+# Обработка обновлений от Telegram (Webhook)
 async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         return web.Response(status=403)
@@ -65,9 +68,18 @@ async def handle_webhook(request):
     await dp.feed_update(bot, update)
     return web.Response()
 
+# Роут для ручной установки webhook с любого URL (в том числе после деплоя)
+async def set_webhook_handler(request):
+    url = request.query.get("url")
+    if not url:
+        return web.Response(text="Missing 'url' parameter", status=400)
+    await bot.set_webhook(url, secret_token=WEBHOOK_SECRET)
+    return web.Response(text=f"Webhook set to {url}")
+
 def main():
     app = web.Application()
     app.router.add_post(WEBHOOK_PATH, handle_webhook)
+    app.router.add_get("/set_webhook", set_webhook_handler)
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
 
