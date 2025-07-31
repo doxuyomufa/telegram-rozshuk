@@ -1,2 +1,4 @@
 aiogram==3.4.1
 aiohttp==3.9.1
+httpx==0.24.1   # Без Rust
+pydantic==1.10.13
