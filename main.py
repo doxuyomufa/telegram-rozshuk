@@ -19,8 +19,12 @@ cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, userna
 conn.commit()
 
 # --- Кнопки ---
-main_menu = ReplyKeyboardMarkup(resize_keyboard=True)
-main_menu.add(KeyboardButton("Хочу консультацию"), KeyboardButton("Просто узнать"))
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Хочу консультацию"), KeyboardButton(text="Просто узнать")]
+    ],
+    resize_keyboard=True
+)
 
 # --- Старт ---
 @dp.message(Command("start"))
@@ -40,8 +44,10 @@ async def after_captcha(message: types.Message):
 async def ask_interest(message: types.Message):
     cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
     conn.commit()
-    markup = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(text="Написать менеджеру", url="https://t.me/ManagerUsername")
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Написать менеджеру", url="https://t.me/ManagerUsername")]
+        ]
     )
     await message.answer("Спасибо! Свяжитесь с нашим менеджером:", reply_markup=markup)
 
