@@ -8,15 +8,22 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
 
-API_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+API_TOKEN = os.getenv("BOT_TOKEN")
+if not API_TOKEN:
+    raise RuntimeError("BOT_TOKEN is not set in environment variables")
+
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_SECRET = "super_secret_key"  # можно любой текст
-WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "super_secret_key")
+RENDER_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if not RENDER_HOSTNAME:
+    raise RuntimeError("RENDER_EXTERNAL_HOSTNAME is not set in environment variables")
+
+WEBHOOK_URL = f"https://{RENDER_HOSTNAME}{WEBHOOK_PATH}"
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # --- База данных ---
 conn = sqlite3.connect("db.sqlite3")
@@ -68,9 +75,11 @@ async def stats(message: types.Message):
 # --- Webhook-сервер ---
 async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
+    logging.info(f"Webhook set to {WEBHOOK_URL}")
 
 async def on_shutdown(app):
     await bot.delete_webhook()
+    logging.info("Webhook deleted")
 
 async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
