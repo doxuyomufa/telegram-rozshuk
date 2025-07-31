@@ -10,7 +10,7 @@ from aiohttp import web
 
 API_TOKEN = "8415722752:AAG223wC-0PAlDd0Ax-jYKpIOVgC7g1M_QU"
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_SECRET = "super_secret_key"  # можно любой текст
+WEBHOOK_SECRET = "super_secret_key"
 WEBHOOK_URL = "https://telegram-bot-1-fwf1.onrender.com/webhook"
 
 logging.basicConfig(level=logging.INFO)
@@ -27,20 +27,15 @@ cursor.execute(
 conn.commit()
 
 # --- Кнопки ---
-main_menu = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Хочу консультацию"), KeyboardButton(text="Просто узнать")]
-    ],
-    resize_keyboard=True,
-)
-
-# Новое меню после прохождения проверки
 interest_menu = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="Зняти з Розшуку"),
             KeyboardButton(text="Бронювання"),
+        ],
+        [
             KeyboardButton(text="Виїзд за кордон"),
+            KeyboardButton(text="СЗЧ/Коміс"),
         ]
     ],
     resize_keyboard=True,
@@ -51,6 +46,21 @@ consultation_button = InlineKeyboardMarkup(
         [InlineKeyboardButton(text="Консультація", url="https://t.me/robic33ai")]
     ]
 )
+
+# --- Тексти ---
+texts = {
+    "Зняти з Розшуку": "✅ Зняття з РОЗШУКУ на 1 рік ...\n\nна головну - /start\nзняття СЗЧ - /military",
+    "Бронювання": "✅ БРОНЮВАННЯ і відстрочка на 1 рік ...\n\nна головну - /start\nзняття з РОЗШУКУ - /rozshuk",
+    "Виїзд за кордон": "✅ Виключення з обліку на 5 років ...\n\nна головну - /start\nвиведення з ЗС - /military",
+    "СЗЧ/Коміс": "✅  Зняття СЗЧ на гарантований 1 рік ...\n\nна головну - /start\nвиведення з ЗС - /rozshuk",
+}
+
+images = {
+    "Зняти з Розшуку": "images/rozshuk.jpg",
+    "Бронювання": "images/bron.jpg",
+    "Виїзд за кордон": "images/vyezd.jpg",
+    "СЗЧ/Коміс": "images/szch.jpg",
+}
 
 # --- Хендлеры ---
 @dp.message(Command("start"))
@@ -66,50 +76,20 @@ async def after_captcha(message: types.Message):
     conn.commit()
     await message.answer("Чудово, Ви пройшли перевірку! Що Вас цікавить?", reply_markup=interest_menu)
 
-# Новый хендлер для трёх новых кнопок
-@dp.message(F.text.in_(["Зняти з Розшуку", "Бронювання", "Виїзд за кордон"]))
-async def interest_choice(message: types.Message):
-    cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
-    conn.commit()
+@dp.message(F.text.in_(["Зняти з Розшуку", "Бронювання", "Виїзд за кордон", "СЗЧ/Коміс"]))
+async def send_info(message: types.Message):
+    choice = message.text
+    photo_path = images[choice]
 
-    if message.text == "Зняти з Розшуку":
-        text = (
-            "Інформація про зняття з розшуку:\n"
-            "Тут опис процедури, необхідні документи та контакти.\n"
-        )
-    elif message.text == "Бронювання":
-        text = (
-            "Інформація про бронювання:\n"
-            "Як зробити бронювання, терміни та умови.\n"
-        )
-    elif message.text == "Виїзд за кордон":
-        text = (
-            "Інформація про виїзд за кордон:\n"
-            "Правила, необхідні документи та поради.\n"
-        )
-    else:
-        text = "Інформація відсутня."
+    # Надсилаємо фото + текст одночасно
+    with open(photo_path, "rb") as photo:
+        sent_photo = await message.answer_photo(photo, caption=texts[choice], reply_markup=consultation_button)
 
-    await message.answer(text, reply_markup=consultation_button)
+    # Чекаємо 5 сек і видаляємо фото (текст залишається, бо він у caption)
+    await asyncio.sleep(5)
+    await sent_photo.delete()
 
-@dp.message(F.text.in_(["Хочу консультацию", "Просто узнать"]))
-async def ask_interest(message: types.Message):
-    cursor.execute("UPDATE users SET interactions = interactions + 1 WHERE id = ?", (message.from_user.id,))
-    conn.commit()
-    manager_button = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Написать менеджеру", url="https://t.me/ManagerUsername")]
-        ]
-    )
-    await message.answer("Спасибо! Свяжитесь с нашим менеджером:", reply_markup=manager_button)
-
-@dp.message(Command("stats"))
-async def stats(message: types.Message):
-    cursor.execute("SELECT COUNT(*), SUM(interactions) FROM users")
-    users, interactions = cursor.fetchone()
-    await message.answer(f"Пользователей: {users}\nВсего взаимодействий: {interactions or 0}")
-
-# --- Webhook-сервер ---
+# --- Webhook ---
 async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
 
