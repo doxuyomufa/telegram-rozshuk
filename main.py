@@ -1,11 +1,9 @@
 import logging
 import sqlite3
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.filters.text import Text
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram import F
 import asyncio
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command, Text
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 API_TOKEN = "7922526391:AAF6f9uxMOc2CDvaHBU5NrX7DI9ET-d-ysE"
 
